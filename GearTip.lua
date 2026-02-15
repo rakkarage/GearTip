@@ -58,19 +58,18 @@ local function RequestItemLevel(unit)
         return cached.ilvl
     end
 
-    if not CheckInteractDistance(unit, 1) then
-        return nil
-    end
-
     if pendingInspects[guid] then
         return nil
     end
 
-    if CanInspect(unit) then
+    local lastInspectTime = 0
+
+    if CanInspect(unit) and (GetTime() - lastInspectTime) > 1 then
         NotifyInspect(unit)
         pendingInspects[guid] = unit
+        lastInspectTime = GetTime()
     end
-
+    
     return nil
 end
 
