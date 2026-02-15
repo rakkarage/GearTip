@@ -75,17 +75,17 @@ local function RequestItemLevel(unit)
 end
 
 TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
-    if not tooltip or tooltip ~= GameTooltip then
+    if tooltip ~= GameTooltip or not data then
         return
     end
 
-    local _, unit = tooltip:GetUnit()
+    local unit = data.unitToken
 
-    if not unit then
-        return
+    if not unit and UnitExists("mouseover") then
+        unit = "mouseover"
     end
 
-    if not UnitIsPlayer(unit) then
+    if not unit or not UnitIsPlayer(unit) then
         return
     end
 
@@ -99,8 +99,7 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
     end
 
     if ilvl then
-        local ilvlText = string.format("Item Level: %.1f", ilvl)
-        tooltip:AddLine(ilvlText, 1, 1, 0.5)
+        tooltip:AddLine(string.format("Item Level: %.1f", ilvl), 1, 1, 0.5)
         tooltip:Show()
     end
 end)
