@@ -1,9 +1,9 @@
 ## Interface: 120000
-## Title: Gear
+## Title: GearTip
 ## Notes: Shows average item level on player tooltips.
 ## Category: User Interface
 ## Author: rakkarage
-## IconTexture: Interface/AddOns/Gear/Gear.png
+## IconTexture: Interface/AddOns/GearTip/GearTip.png
 ## Version: v2026
 
-SimpleItemLevel.lua
+GearTip.lua
