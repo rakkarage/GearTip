@@ -6,6 +6,7 @@ local inspectingUnit = nil
 local inspectingTime = 0
 local lastInspectTime = 0
 local CACHE_TTL = 300
+local SELF_CACHE_TTL = 30
 local INSPECT_TIMEOUT = 5
 
 local function CalculateItemLevel(unit)
@@ -100,7 +101,7 @@ frame:SetScript("OnEvent", function(_, event, guid)
 	end
 end)
 
-frame:SetScript("OnUpdate", DrainQueue)
+C_Timer.NewTicker(0.1, DrainQueue)
 
 TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
 	if tooltip ~= GameTooltip or not data then return end
@@ -110,8 +111,15 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
 
 	local ilvl
 	if UnitIsUnit(unit, "player") then
-		local _, equipped = GetAverageItemLevel()
-		ilvl = equipped
+		local selfGuid = UnitGUID("player")
+		local cached = inspectCache[selfGuid]
+		if cached and (GetTime() - cached.time) < SELF_CACHE_TTL then
+			ilvl = cached.ilvl
+		else
+			local _, equipped = GetAverageItemLevel()
+			ilvl = equipped
+			inspectCache[selfGuid] = { ilvl = ilvl, time = GetTime() }
+		end
 	else
 		local guid = UnitGUID(unit)
 		local cached = guid and inspectCache[guid]
