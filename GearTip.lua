@@ -43,6 +43,8 @@ frame:SetScript("OnEvent", function(self, event, guid)
     end
 end)
 
+local lastInspectTime = 0
+
 local function RequestItemLevel(unit)
     if not unit or not UnitIsPlayer(unit) or UnitIsUnit(unit, "player") then
         return nil
@@ -62,14 +64,12 @@ local function RequestItemLevel(unit)
         return nil
     end
 
-    local lastInspectTime = 0
-
     if CanInspect(unit) and (GetTime() - lastInspectTime) > 1 then
         NotifyInspect(unit)
         pendingInspects[guid] = unit
         lastInspectTime = GetTime()
     end
-    
+
     return nil
 end
 
