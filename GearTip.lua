@@ -31,8 +31,7 @@ local function EnqueueInspect(unit)
 	if not CanInspect(unit) then return end
 	local guid = UnitGUID(unit)
 	if not guid then return end
-	local cached = inspectCache[guid]
-	if cached and (GetTime() - cached.time) < CACHE_TTL then return end
+	if inspectCache[guid] and (GetTime() - inspectCache[guid].time) < CACHE_TTL then return end
 	if queuedGuids[guid] or currentlyInspecting == guid then return end
 	table.insert(inspectQueue, { guid = guid, unit = unit })
 	queuedGuids[guid] = true
@@ -56,13 +55,12 @@ local function DrainQueue()
 		entry = table.remove(inspectQueue, 1)
 		if not entry then return end
 		queuedGuids[entry.guid] = nil
-		if not UnitExists(entry.unit) or UnitGUID(entry.unit) ~= entry.guid then
+		if not UnitExists(entry.unit) or not CanInspect(entry.unit) then
 			entry = nil
 		end
 	until entry or #inspectQueue == 0
 	if not entry then return end
 
-	if not CanInspect(entry.unit) then return end
 	NotifyInspect(entry.unit)
 	currentlyInspecting = entry.guid
 	inspectingUnit = entry.unit
@@ -75,21 +73,18 @@ frame:RegisterEvent("INSPECT_READY")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 frame:SetScript("OnEvent", function(_, event, guid)
 	if event == "UPDATE_MOUSEOVER_UNIT" then
-		local unit = "mouseover"
-		if UnitExists(unit) and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") then
-			EnqueueInspect(unit)
+		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
+			EnqueueInspect("mouseover")
 		end
 	elseif event == "INSPECT_READY" then
-		if guid ~= currentlyInspecting then
+		if not currentlyInspecting then
 			ClearInspectPlayer()
 			return
 		end
-		local unit = (UnitExists("mouseover") and UnitGUID("mouseover") == guid)
-			and "mouseover" or inspectingUnit
-		local ilvl = CalculateItemLevel(unit)
+		local ilvl = CalculateItemLevel(inspectingUnit)
 		if ilvl then
-			inspectCache[guid] = { ilvl = ilvl, time = GetTime() }
-			if UnitExists("mouseover") and UnitGUID("mouseover") == guid then
+			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
+			if UnitExists("mouseover") and inspectingUnit == "mouseover" then
 				GameTooltip:AddLine(string.format("Item Level: %.1f", ilvl), 1, 1, 0.5)
 				GameTooltip:Show()
 			end
