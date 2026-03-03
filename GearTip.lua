@@ -25,6 +25,26 @@ local function CalculateItemLevel(unit)
 	return itemCount > 0 and (totalItemLevel / itemCount) or nil
 end
 
+local function GetSelfIlvl()
+	local selfGuid = UnitGUID("player")
+	local cached = inspectCache[selfGuid]
+	if cached and (GetTime() - cached.time) < SELF_CACHE_TTL then
+		return cached.ilvl
+	end
+	local _, equipped = GetAverageItemLevel()
+	inspectCache[selfGuid] = { ilvl = equipped, time = GetTime() }
+	return equipped
+end
+
+local function AddIlvlLine(tooltip, ilvl, selfIlvl)
+	local icon = ilvl >= selfIlvl
+		and "|TInterface\\Icons\\Inv_10_engineering_manufacturedparts_gear_firey:14|t"
+		or "|TInterface\\Icons\\Inv_misc_gear_01:14|t"
+	local color = ilvl >= selfIlvl and "|cFF1eff00" or "|cFFaaaaaa"
+	tooltip:AddLine(icon .. color .. string.format(": %.1f", ilvl) .. "|r")
+	tooltip:Show()
+end
+
 local function EnqueueInspect(unit)
 	if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return end
 	if UnitIsUnit(unit, "player") then return end
@@ -71,7 +91,7 @@ end
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("INSPECT_READY")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-frame:SetScript("OnEvent", function(_, event, guid)
+frame:SetScript("OnEvent", function(_, event)
 	if event == "UPDATE_MOUSEOVER_UNIT" then
 		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
 			EnqueueInspect("mouseover")
@@ -85,8 +105,7 @@ frame:SetScript("OnEvent", function(_, event, guid)
 		if ilvl then
 			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
 			if UnitExists("mouseover") and inspectingUnit == "mouseover" then
-				GameTooltip:AddLine(string.format("Item Level: %.1f", ilvl), 1, 1, 0.5)
-				GameTooltip:Show()
+				AddIlvlLine(GameTooltip, ilvl, GetSelfIlvl())
 			end
 		end
 		currentlyInspecting = nil
@@ -106,15 +125,7 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
 
 	local ilvl
 	if UnitIsUnit(unit, "player") then
-		local selfGuid = UnitGUID("player")
-		local cached = inspectCache[selfGuid]
-		if cached and (GetTime() - cached.time) < SELF_CACHE_TTL then
-			ilvl = cached.ilvl
-		else
-			local _, equipped = GetAverageItemLevel()
-			ilvl = equipped
-			inspectCache[selfGuid] = { ilvl = ilvl, time = GetTime() }
-		end
+		ilvl = GetSelfIlvl()
 	else
 		local guid = UnitGUID(unit)
 		local cached = guid and inspectCache[guid]
@@ -126,7 +137,6 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
 	end
 
 	if ilvl then
-		tooltip:AddLine(string.format("Item Level: %.1f", ilvl), 1, 1, 0.5)
-		tooltip:Show()
+		AddIlvlLine(tooltip, ilvl, GetSelfIlvl())
 	end
 end)
