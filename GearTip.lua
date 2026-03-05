@@ -41,7 +41,7 @@ local function AddIlvlLine(tooltip, ilvl, selfIlvl)
 		and "|TInterface\\Icons\\Inv_10_engineering_manufacturedparts_gear_firey:14|t"
 		or "|TInterface\\Icons\\Inv_misc_gear_01:14|t"
 	local color = ilvl >= selfIlvl and "|cFF1eff00" or "|cFFaaaaaa"
-	tooltip:AddLine(icon .. color .. string.format(": %.1f", ilvl) .. "|r")
+	tooltip:AddLine(icon .. color .. string.format(" %.1f", ilvl) .. "|r")
 	tooltip:Show()
 end
 
