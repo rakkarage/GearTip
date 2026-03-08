@@ -50,7 +50,7 @@ local function EnqueueInspect(unit)
 	if UnitIsUnit(unit, "player") then return end
 	if not CanInspect(unit) then return end
 	local guid = UnitGUID(unit)
-	if not guid then return end
+	if not guid or issecretvalue(guid) then return end
 	if inspectCache[guid] and (GetTime() - inspectCache[guid].time) < CACHE_TTL then return end
 	if queuedGuids[guid] or currentlyInspecting == guid then return end
 	table.insert(inspectQueue, { guid = guid, unit = unit })
@@ -128,7 +128,8 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
 		ilvl = GetSelfIlvl()
 	else
 		local guid = UnitGUID(unit)
-		local cached = guid and inspectCache[guid]
+		if not guid or issecretvalue(guid) then return end
+		local cached = inspectCache[guid]
 		if cached and (GetTime() - cached.time) < CACHE_TTL then
 			ilvl = cached.ilvl
 		else
