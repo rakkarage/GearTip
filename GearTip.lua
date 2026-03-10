@@ -88,14 +88,23 @@ local function DrainQueue()
 	lastInspectTime = GetTime()
 end
 
+local function InvalidateSelfCache()
+	local selfGuid = UnitGUID("player")
+	inspectCache[selfGuid] = nil
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("INSPECT_READY")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 frame:SetScript("OnEvent", function(_, event)
 	if event == "UPDATE_MOUSEOVER_UNIT" then
 		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
 			EnqueueInspect("mouseover")
 		end
+	elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
+		InvalidateSelfCache()
 	elseif event == "INSPECT_READY" then
 		if not currentlyInspecting then
 			ClearInspectPlayer()
