@@ -45,6 +45,38 @@ local function AddIlvlLine(tooltip, ilvl, selfIlvl)
 	tooltip:Show()
 end
 
+-- Attempt to resolve a GUID to a live unit token by checking all visible units.
+local function ResolveGuidToUnit(guid)
+	-- Check common static tokens first
+	for _, token in ipairs({ "player", "target", "mouseover", "focus", "targettarget" }) do
+		if UnitExists(token) and UnitGUID(token) == guid then
+			return token
+		end
+	end
+	-- Always check party1-4 and their pets (party never uses index 5+, that's raid)
+	for i = 1, 4 do
+		local token = "party" .. i
+		if UnitExists(token) and UnitGUID(token) == guid then
+			return token
+		end
+	end
+	-- Check raid1-40 (also covers when you're in a raid and not using party tokens)
+	for i = 1, 40 do
+		local token = "raid" .. i
+		if UnitExists(token) and UnitGUID(token) == guid then
+			return token
+		end
+	end
+	-- Check nameplates
+	for i = 1, 40 do
+		local token = "nameplate" .. i
+		if UnitExists(token) and UnitGUID(token) == guid then
+			return token
+		end
+	end
+	return nil
+end
+
 local function EnqueueInspect(unit)
 	if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return end
 	if UnitIsUnit(unit, "player") then return end
@@ -53,7 +85,8 @@ local function EnqueueInspect(unit)
 	if not guid or issecretvalue(guid) then return end
 	if inspectCache[guid] and (GetTime() - inspectCache[guid].time) < CACHE_TTL then return end
 	if queuedGuids[guid] or currentlyInspecting == guid then return end
-	table.insert(inspectQueue, { guid = guid, unit = unit })
+	-- Store only the GUID; unit token is resolved fresh at drain time
+	table.insert(inspectQueue, guid)
 	queuedGuids[guid] = true
 end
 
@@ -70,20 +103,23 @@ local function DrainQueue()
 	if #inspectQueue == 0 then return end
 	if (GetTime() - lastInspectTime) < 1 then return end
 
-	local entry
+	local guid, unit
 	repeat
-		entry = table.remove(inspectQueue, 1)
-		if not entry then return end
-		queuedGuids[entry.guid] = nil
-		if not UnitExists(entry.unit) or not CanInspect(entry.unit) then
-			entry = nil
+		guid = table.remove(inspectQueue, 1)
+		if not guid then return end
+		queuedGuids[guid] = nil
+		-- Resolve the GUID to a current live unit token
+		unit = ResolveGuidToUnit(guid)
+		if not unit or not CanInspect(unit) then
+			guid = nil
+			unit = nil
 		end
-	until entry or #inspectQueue == 0
-	if not entry then return end
+	until guid or #inspectQueue == 0
+	if not guid then return end
 
-	NotifyInspect(entry.unit)
-	currentlyInspecting = entry.guid
-	inspectingUnit = entry.unit
+	NotifyInspect(unit)
+	currentlyInspecting = guid
+	inspectingUnit = unit
 	inspectingTime = GetTime()
 	lastInspectTime = GetTime()
 end
@@ -93,13 +129,29 @@ local function InvalidateSelfCache()
 	inspectCache[selfGuid] = nil
 end
 
+local function EnqueueGroupMembers()
+	local groupSize = GetNumGroupMembers()
+	if groupSize == 0 then return end
+	local prefix = IsInRaid() and "raid" or "party"
+	local limit = IsInRaid() and 40 or 4
+	for i = 1, limit do
+		local token = prefix .. i
+		if UnitExists(token) then
+			EnqueueInspect(token)
+		end
+	end
+end
+
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("INSPECT_READY")
 frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 frame:SetScript("OnEvent", function(_, event)
-	if event == "UPDATE_MOUSEOVER_UNIT" then
+	if event == "GROUP_ROSTER_UPDATE" then
+		EnqueueGroupMembers()
+	elseif event == "UPDATE_MOUSEOVER_UNIT" then
 		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
 			EnqueueInspect("mouseover")
 		end
@@ -110,10 +162,13 @@ frame:SetScript("OnEvent", function(_, event)
 			ClearInspectPlayer()
 			return
 		end
-		local ilvl = CalculateItemLevel(inspectingUnit)
+		-- Re-resolve unit token in case it shifted since NotifyInspect
+		local unit = ResolveGuidToUnit(currentlyInspecting)
+		local ilvl = unit and CalculateItemLevel(unit) or nil
 		if ilvl then
 			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
-			if UnitExists("mouseover") and inspectingUnit == "mouseover" then
+			-- Only annotate tooltip if mouseover is still this person
+			if UnitExists("mouseover") and UnitGUID("mouseover") == currentlyInspecting then
 				AddIlvlLine(GameTooltip, ilvl, GetSelfIlvl())
 			end
 		end
