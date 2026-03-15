@@ -2,7 +2,6 @@ local inspectCache = {}
 local inspectQueue = {}
 local queuedGuids = {}
 local currentlyInspecting = nil
-local inspectingUnit = nil
 local inspectingTime = 0
 local lastInspectTime = 0
 local CACHE_TTL = 300
@@ -70,7 +69,6 @@ local function EnqueueInspect(unit)
 	if not guid or issecretvalue(guid) then return end
 	if inspectCache[guid] and (GetTime() - inspectCache[guid].time) < CACHE_TTL then return end
 	if queuedGuids[guid] or currentlyInspecting == guid then return end
-	-- Store only the GUID; unit token is resolved fresh at drain time
 	table.insert(inspectQueue, guid)
 	queuedGuids[guid] = true
 end
@@ -79,7 +77,6 @@ local function DrainQueue()
 	if currentlyInspecting and (GetTime() - inspectingTime) > INSPECT_TIMEOUT then
 		queuedGuids[currentlyInspecting] = nil
 		currentlyInspecting = nil
-		inspectingUnit = nil
 		inspectingTime = 0
 		ClearInspectPlayer()
 	end
@@ -93,7 +90,6 @@ local function DrainQueue()
 		guid = table.remove(inspectQueue, 1)
 		if not guid then return end
 		queuedGuids[guid] = nil
-		-- Resolve the GUID to a current live unit token
 		unit = ResolveGuidToUnit(guid)
 		if not unit or not CanInspect(unit) then
 			guid = nil
@@ -104,21 +100,18 @@ local function DrainQueue()
 
 	NotifyInspect(unit)
 	currentlyInspecting = guid
-	inspectingUnit = unit
 	inspectingTime = GetTime()
 	lastInspectTime = GetTime()
 end
 
 local function InvalidateSelfCache()
-	local selfGuid = UnitGUID("player")
-	inspectCache[selfGuid] = nil
+	inspectCache[UnitGUID("player")] = nil
 end
 
 local function EnqueueGroupMembers()
-	local groupSize = GetNumGroupMembers()
-	if groupSize == 0 then return end
+	if GetNumGroupMembers() == 0 then return end
 	local prefix = IsInRaid() and "raid" or "party"
-	local limit = IsInRaid() and 40 or 4
+	local limit  = IsInRaid() and 40 or 4
 	for i = 1, limit do
 		local token = prefix .. i
 		if UnitExists(token) then
@@ -147,19 +140,16 @@ frame:SetScript("OnEvent", function(_, event)
 			ClearInspectPlayer()
 			return
 		end
-		-- Re-resolve unit token in case it shifted since NotifyInspect
 		local unit = ResolveGuidToUnit(currentlyInspecting)
 		local ilvl = unit and CalculateItemLevel(unit) or nil
 		if ilvl then
 			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
-			-- Only annotate tooltip if mouseover is still this person
 			local mouseGuid = UnitGUID("mouseover")
 			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == currentlyInspecting then
 				AddIlvlLine(GameTooltip, ilvl, GetSelfIlvl())
 			end
 		end
 		currentlyInspecting = nil
-		inspectingUnit = nil
 		inspectingTime = 0
 		ClearInspectPlayer()
 	end
