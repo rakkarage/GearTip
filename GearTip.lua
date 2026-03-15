@@ -45,33 +45,18 @@ local function AddIlvlLine(tooltip, ilvl, selfIlvl)
 	tooltip:Show()
 end
 
--- Attempt to resolve a GUID to a live unit token by checking all visible units.
+local UNIT_TOKENS = { "player", "target", "mouseover", "focus", "targettarget" }
+for i = 1, 4 do UNIT_TOKENS[#UNIT_TOKENS + 1] = "party" .. i end
+for i = 1, 40 do UNIT_TOKENS[#UNIT_TOKENS + 1] = "raid" .. i end
+for i = 1, 40 do UNIT_TOKENS[#UNIT_TOKENS + 1] = "nameplate" .. i end
+
 local function ResolveGuidToUnit(guid)
-	-- Check common static tokens first
-	for _, token in ipairs({ "player", "target", "mouseover", "focus", "targettarget" }) do
-		if UnitExists(token) and UnitGUID(token) == guid then
-			return token
-		end
-	end
-	-- Always check party1-4 and their pets (party never uses index 5+, that's raid)
-	for i = 1, 4 do
-		local token = "party" .. i
-		if UnitExists(token) and UnitGUID(token) == guid then
-			return token
-		end
-	end
-	-- Check raid1-40 (also covers when you're in a raid and not using party tokens)
-	for i = 1, 40 do
-		local token = "raid" .. i
-		if UnitExists(token) and UnitGUID(token) == guid then
-			return token
-		end
-	end
-	-- Check nameplates
-	for i = 1, 40 do
-		local token = "nameplate" .. i
-		if UnitExists(token) and UnitGUID(token) == guid then
-			return token
+	for _, token in ipairs(UNIT_TOKENS) do
+		if UnitExists(token) then
+			local tokenGuid = UnitGUID(token)
+			if tokenGuid and not issecretvalue(tokenGuid) and tokenGuid == guid then
+				return token
+			end
 		end
 	end
 	return nil
@@ -168,7 +153,8 @@ frame:SetScript("OnEvent", function(_, event)
 		if ilvl then
 			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
 			-- Only annotate tooltip if mouseover is still this person
-			if UnitExists("mouseover") and UnitGUID("mouseover") == currentlyInspecting then
+			local mouseGuid = UnitGUID("mouseover")
+			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == currentlyInspecting then
 				AddIlvlLine(GameTooltip, ilvl, GetSelfIlvl())
 			end
 		end
