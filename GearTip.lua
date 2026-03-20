@@ -35,12 +35,32 @@ local function GetSelfIlvl()
 	return equipped
 end
 
+local function GetGradientColor(ilvl, selfIlvl)
+	local diff = ilvl - selfIlvl
+	local t = math.max(-1, math.min(1, diff / 15)) -- -1 = grey, 0 = white, 1 = green
+	local r, g, b
+	if t < 0 then
+		-- grey (#999999) → white (#ffffff)
+		local s = t + 1 -- 0..1
+		r = 0.6 + (0.4 * s)
+		g = 0.6 + (0.4 * s)
+		b = 0.6 + (0.4 * s)
+	else
+		-- white (#ffffff) → green (#00ff00)
+		r = 1 - t
+		g = 1
+		b = 1 - t
+	end
+	return r, g, b
+end
+
 local function AddIlvlLine(tooltip, ilvl, selfIlvl)
+	local r, g, b = GetGradientColor(ilvl, selfIlvl)
+	local hex = string.format("%02x%02x%02x", r * 255, g * 255, b * 255)
 	local icon = ilvl >= selfIlvl
 		and "|TInterface\\Icons\\Inv_10_engineering_manufacturedparts_gear_firey:14|t"
 		or "|TInterface\\Icons\\Inv_misc_gear_01:14|t"
-	local color = ilvl >= selfIlvl and "|cFF1eff00" or "|cFFaaaaaa"
-	tooltip:AddLine(icon .. color .. string.format(" %.1f", ilvl) .. "|r")
+	tooltip:AddLine(icon .. "|cFF" .. hex .. string.format(" %.1f", ilvl) .. "|r")
 	tooltip:Show()
 end
 
