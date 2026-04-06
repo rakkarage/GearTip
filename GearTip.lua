@@ -6,6 +6,7 @@ ns.GearTip = {
 	CACHE_TTL = 300,
 	SELF_CACHE_TTL = 30,
 	INSPECT_TIMEOUT = 5,
+	MAX_QUEUE_SIZE = 50, -- Prevent unbounded queue growth in large raids
 	inspectCache = {},
 	inspectQueue = {},
 	queuedGuids = {},
@@ -81,7 +82,7 @@ function GearTip:ResolveGuidToUnit(guid)
 		if UnitExists(token) then
 			local tokenGuid = UnitGUID(token)
 			if tokenGuid and not issecretvalue(tokenGuid) and tokenGuid == guid then
-				return token
+				return token -- Found match, return immediately (early exit optimization)
 			end
 		end
 	end
@@ -96,6 +97,8 @@ function GearTip:EnqueueInspect(unit)
 	if not guid or issecretvalue(guid) then return end
 	if self.inspectCache[guid] and (GetTime() - self.inspectCache[guid].time) < self.CACHE_TTL then return end
 	if self.queuedGuids[guid] or self.currentlyInspecting == guid then return end
+	-- Prevent unbounded queue growth in large raids by capping queue size
+	if #self.inspectQueue >= self.MAX_QUEUE_SIZE then return end
 	table.insert(self.inspectQueue, guid)
 	self.queuedGuids[guid] = true
 end
@@ -149,6 +152,7 @@ end
 
 GearTip.frame = CreateFrame("Frame")
 GearTip.frame:RegisterEvent("INSPECT_READY")
+GearTip.frame:RegisterEvent("INSPECT_FAILED")
 GearTip.frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 GearTip.frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 GearTip.frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
@@ -176,6 +180,12 @@ GearTip.frame:SetScript("OnEvent", function(_, event)
 				GearTip:AddIlvlLine(GameTooltip, ilvl, GearTip:GetSelfIlvl())
 			end
 		end
+		GearTip.currentlyInspecting = nil
+		GearTip.inspectingTime = 0
+		ClearInspectPlayer()
+	elseif event == "INSPECT_FAILED" then
+		-- Handle inspect timeout gracefully: clear pending inspect and move to next in queue
+		GearTip.queuedGuids[GearTip.currentlyInspecting] = nil
 		GearTip.currentlyInspecting = nil
 		GearTip.inspectingTime = 0
 		ClearInspectPlayer()
