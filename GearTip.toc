@@ -1,5 +1,5 @@
 ## Title: GearTip
-## Notes: Shows average item level on player tooltips.
+## Notes: Shows average item level on unit tooltips.
 ## Category: User Interface
 ## Author: rakkarage
 ## IconTexture: Interface/AddOns/GearTip/GearTip.png

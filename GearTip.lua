@@ -1,4 +1,4 @@
--- GearTip: Shows item level on unit tooltips
+-- ⚙️ GearTip: Shows average item level on unit tooltips.
 
 local _, ns = ...
 
