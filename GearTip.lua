@@ -152,7 +152,6 @@ end
 
 GearTip.frame = CreateFrame("Frame")
 GearTip.frame:RegisterEvent("INSPECT_READY")
-GearTip.frame:RegisterEvent("INSPECT_FAILED")
 GearTip.frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 GearTip.frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 GearTip.frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
@@ -180,12 +179,6 @@ GearTip.frame:SetScript("OnEvent", function(_, event)
 				GearTip:AddIlvlLine(GameTooltip, ilvl, GearTip:GetSelfIlvl())
 			end
 		end
-		GearTip.currentlyInspecting = nil
-		GearTip.inspectingTime = 0
-		ClearInspectPlayer()
-	elseif event == "INSPECT_FAILED" then
-		-- Handle inspect timeout gracefully: clear pending inspect and move to next in queue
-		GearTip.queuedGuids[GearTip.currentlyInspecting] = nil
 		GearTip.currentlyInspecting = nil
 		GearTip.inspectingTime = 0
 		ClearInspectPlayer()
