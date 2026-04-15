@@ -2,19 +2,19 @@
 
 local _, ns = ...
 
-ns.GearTip = {
-	CACHE_TTL = 300,
-	SELF_CACHE_TTL = 30,
-	INSPECT_TIMEOUT = 5,
-	MAX_QUEUE_SIZE = 50, -- Prevent unbounded queue growth in large raids
-	inspectCache = {},
-	inspectQueue = {},
-	queuedGuids = {},
-	currentlyInspecting = nil,
-	inspectingTime = 0,
-	lastInspectTime = 0,
-}
+ns.GearTip = CreateFrame("Frame")
 local GearTip = ns.GearTip
+
+GearTip.CACHE_TTL = 300
+GearTip.SELF_CACHE_TTL = 30
+GearTip.INSPECT_TIMEOUT = 5
+GearTip.MAX_QUEUE_SIZE = 40
+GearTip.inspectCache = {}
+GearTip.inspectQueue = {}
+GearTip.queuedGuids = {}
+GearTip.currentlyInspecting = nil
+GearTip.inspectingTime = 0
+GearTip.lastInspectTime = 0
 
 local UNIT_TOKENS = { "player", "target", "mouseover", "focus", "targettarget" }
 for i = 1, 4 do UNIT_TOKENS[#UNIT_TOKENS + 1] = "party" .. i end
@@ -97,7 +97,6 @@ function GearTip:EnqueueInspect(unit)
 	if not guid or issecretvalue(guid) then return end
 	if self.inspectCache[guid] and (GetTime() - self.inspectCache[guid].time) < self.CACHE_TTL then return end
 	if self.queuedGuids[guid] or self.currentlyInspecting == guid then return end
-	-- Prevent unbounded queue growth in large raids by capping queue size
 	if #self.inspectQueue >= self.MAX_QUEUE_SIZE then return end
 	table.insert(self.inspectQueue, guid)
 	self.queuedGuids[guid] = true
@@ -150,13 +149,12 @@ function GearTip:EnqueueGroupMembers()
 	end
 end
 
-GearTip.frame = CreateFrame("Frame")
-GearTip.frame:RegisterEvent("INSPECT_READY")
-GearTip.frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-GearTip.frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-GearTip.frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
-GearTip.frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-GearTip.frame:SetScript("OnEvent", function(_, event)
+GearTip:RegisterEvent("INSPECT_READY")
+GearTip:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+GearTip:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+GearTip:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+GearTip:RegisterEvent("GROUP_ROSTER_UPDATE")
+GearTip:SetScript("OnEvent", function(_, event)
 	if event == "GROUP_ROSTER_UPDATE" then
 		GearTip:EnqueueGroupMembers()
 	elseif event == "UPDATE_MOUSEOVER_UNIT" then
