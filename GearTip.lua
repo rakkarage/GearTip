@@ -139,8 +139,9 @@ end
 
 function GearTip:EnqueueGroupMembers()
 	if GetNumGroupMembers() == 0 then return end
-	local prefix = IsInRaid() and "raid" or "party"
-	local limit  = IsInRaid() and 40 or 4
+	local raid = IsInRaid()
+	local prefix = raid and "raid" or "party"
+	local limit  = raid and 40 or 4
 	for i = 1, limit do
 		local token = prefix .. i
 		if UnitExists(token) then
