@@ -155,31 +155,31 @@ GearTip:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 GearTip:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 GearTip:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 GearTip:RegisterEvent("GROUP_ROSTER_UPDATE")
-GearTip:SetScript("OnEvent", function(_, event)
+GearTip:SetScript("OnEvent", function(self, event)
 	if event == "GROUP_ROSTER_UPDATE" then
-		GearTip:EnqueueGroupMembers()
+		self:EnqueueGroupMembers()
 	elseif event == "UPDATE_MOUSEOVER_UNIT" then
 		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
-			GearTip:EnqueueInspect("mouseover")
+			self:EnqueueInspect("mouseover")
 		end
 	elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
-		GearTip:InvalidateSelfCache()
+		self:InvalidateSelfCache()
 	elseif event == "INSPECT_READY" then
-		if not GearTip.currentlyInspecting then
+		if not self.currentlyInspecting then
 			ClearInspectPlayer()
 			return
 		end
-		local unit = GearTip:ResolveGuidToUnit(GearTip.currentlyInspecting)
+		local unit = self:ResolveGuidToUnit(self.currentlyInspecting)
 		local ilvl = unit and CalculateItemLevel(unit) or nil
 		if ilvl then
-			GearTip.inspectCache[GearTip.currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
+			self.inspectCache[self.currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
 			local mouseGuid = UnitGUID("mouseover")
-			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == GearTip.currentlyInspecting then
-				GearTip:AddIlvlLine(GameTooltip, ilvl, GearTip:GetSelfIlvl())
+			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == self.currentlyInspecting then
+				self:AddIlvlLine(GameTooltip, ilvl, self:GetSelfIlvl())
 			end
 		end
-		GearTip.currentlyInspecting = nil
-		GearTip.inspectingTime = 0
+		self.currentlyInspecting = nil
+		self.inspectingTime = 0
 		ClearInspectPlayer()
 	end
 end)
