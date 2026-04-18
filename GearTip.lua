@@ -1,20 +1,16 @@
 -- ⚙️ GearTip: Shows average item level on unit tooltips.
 
-local _, ns = ...
+local CACHE_TTL = 300
+local SELF_CACHE_TTL = 30
+local INSPECT_TIMEOUT = 5
+local MAX_QUEUE_SIZE = 40
 
-ns.GearTip = CreateFrame("Frame")
-local GearTip = ns.GearTip
-
-GearTip.CACHE_TTL = 300
-GearTip.SELF_CACHE_TTL = 30
-GearTip.INSPECT_TIMEOUT = 5
-GearTip.MAX_QUEUE_SIZE = 40
-GearTip.inspectCache = {}
-GearTip.inspectQueue = {}
-GearTip.queuedGuids = {}
-GearTip.currentlyInspecting = nil
-GearTip.inspectingTime = 0
-GearTip.lastInspectTime = 0
+local inspectCache = {}
+local inspectQueue = {}
+local queuedGuids = {}
+local currentlyInspecting = nil
+local inspectingTime = 0
+local lastInspectTime = 0
 
 local UNIT_TOKENS = { "player", "target", "mouseover", "focus", "targettarget" }
 for i = 1, 4 do UNIT_TOKENS[#UNIT_TOKENS + 1] = "party" .. i end
@@ -37,14 +33,14 @@ local function CalculateItemLevel(unit)
 	return itemCount > 0 and (totalItemLevel / itemCount) or nil
 end
 
-function GearTip:GetSelfIlvl()
+local function GetSelfIlvl()
 	local selfGuid = UnitGUID("player")
-	local cached = self.inspectCache[selfGuid]
-	if cached and (GetTime() - cached.time) < self.SELF_CACHE_TTL then
+	local cached = inspectCache[selfGuid]
+	if cached and (GetTime() - cached.time) < SELF_CACHE_TTL then
 		return cached.ilvl
 	end
 	local _, equipped = GetAverageItemLevel()
-	self.inspectCache[selfGuid] = { ilvl = equipped, time = GetTime() }
+	inspectCache[selfGuid] = { ilvl = equipped, time = GetTime() }
 	return equipped
 end
 
@@ -67,7 +63,7 @@ local function GetGradientColor(ilvl, selfIlvl)
 	return r, g, b
 end
 
-function GearTip:AddIlvlLine(tooltip, ilvl, selfIlvl)
+local function AddIlvlLine(tooltip, ilvl, selfIlvl)
 	local r, g, b = GetGradientColor(ilvl, selfIlvl)
 	local hex = string.format("%02x%02x%02x", r * 255, g * 255, b * 255)
 	local icon = ilvl >= selfIlvl
@@ -77,116 +73,116 @@ function GearTip:AddIlvlLine(tooltip, ilvl, selfIlvl)
 	tooltip:Show()
 end
 
-function GearTip:ResolveGuidToUnit(guid)
+local function ResolveGuidToUnit(guid)
 	for _, token in ipairs(UNIT_TOKENS) do
 		if UnitExists(token) then
 			local tokenGuid = UnitGUID(token)
 			if tokenGuid and not issecretvalue(tokenGuid) and tokenGuid == guid then
-				return token -- Found match, return immediately (early exit optimization)
+				return token
 			end
 		end
 	end
 	return nil
 end
 
-function GearTip:EnqueueInspect(unit)
+local function EnqueueInspect(unit)
 	if not unit or not UnitExists(unit) or not UnitIsPlayer(unit) then return end
 	if UnitIsUnit(unit, "player") then return end
 	if not CanInspect(unit) then return end
 	local guid = UnitGUID(unit)
 	if not guid or issecretvalue(guid) then return end
-	if self.inspectCache[guid] and (GetTime() - self.inspectCache[guid].time) < self.CACHE_TTL then return end
-	if self.queuedGuids[guid] or self.currentlyInspecting == guid then return end
-	if #self.inspectQueue >= self.MAX_QUEUE_SIZE then return end
-	table.insert(self.inspectQueue, guid)
-	self.queuedGuids[guid] = true
+	if inspectCache[guid] and (GetTime() - inspectCache[guid].time) < CACHE_TTL then return end
+	if queuedGuids[guid] or currentlyInspecting == guid then return end
+	if #inspectQueue >= MAX_QUEUE_SIZE then return end
+	table.insert(inspectQueue, guid)
+	queuedGuids[guid] = true
 end
 
-function GearTip:DrainQueue()
-	if self.currentlyInspecting and (GetTime() - self.inspectingTime) > self.INSPECT_TIMEOUT then
-		self.queuedGuids[self.currentlyInspecting] = nil
-		self.currentlyInspecting = nil
-		self.inspectingTime = 0
+local function DrainQueue()
+	if currentlyInspecting and (GetTime() - inspectingTime) > INSPECT_TIMEOUT then
+		queuedGuids[currentlyInspecting] = nil
+		currentlyInspecting = nil
+		inspectingTime = 0
 		ClearInspectPlayer()
 	end
 
-	if self.currentlyInspecting then return end
-	if #self.inspectQueue == 0 then return end
-	if (GetTime() - self.lastInspectTime) < 1 then return end
+	if currentlyInspecting then return end
+	if #inspectQueue == 0 then return end
+	if (GetTime() - lastInspectTime) < 1 then return end
 
 	local guid, unit
 	repeat
-		guid = table.remove(self.inspectQueue, 1)
+		guid = table.remove(inspectQueue, 1)
 		if not guid then return end
-		self.queuedGuids[guid] = nil
-		unit = self:ResolveGuidToUnit(guid)
+		queuedGuids[guid] = nil
+		unit = ResolveGuidToUnit(guid)
 		if not unit or not CanInspect(unit) then
 			guid = nil
 			unit = nil
 		end
-	until guid or #self.inspectQueue == 0
+	until guid or #inspectQueue == 0
 	if not guid then return end
 
 	NotifyInspect(unit)
-	self.currentlyInspecting = guid
-	self.inspectingTime = GetTime()
-	self.lastInspectTime = GetTime()
+	currentlyInspecting = guid
+	inspectingTime = GetTime()
+	lastInspectTime = GetTime()
 end
 
-function GearTip:InvalidateSelfCache()
-	self.inspectCache[UnitGUID("player")] = nil
+local function InvalidateSelfCache()
+	inspectCache[UnitGUID("player")] = nil
 end
 
-function GearTip:EnqueueGroupMembers()
+local function EnqueueGroupMembers()
 	if GetNumGroupMembers() == 0 then return end
 	local raid = IsInRaid()
 	local prefix = raid and "raid" or "party"
-	local limit  = raid and 40 or 4
+	local limit = raid and 40 or 4
 	for i = 1, limit do
 		local token = prefix .. i
 		if UnitExists(token) then
-			self:EnqueueInspect(token)
+			EnqueueInspect(token)
 		end
 	end
 end
 
-GearTip:RegisterEvent("INSPECT_READY")
-GearTip:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-GearTip:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-GearTip:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
-GearTip:RegisterEvent("GROUP_ROSTER_UPDATE")
-GearTip:SetScript("OnEvent", function(self, event)
+local eventFrame = CreateFrame("Frame")
+eventFrame:RegisterEvent("INSPECT_READY")
+eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+eventFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+
+eventFrame:SetScript("OnEvent", function(self, event)
 	if event == "GROUP_ROSTER_UPDATE" then
-		self:EnqueueGroupMembers()
+		EnqueueGroupMembers()
 	elseif event == "UPDATE_MOUSEOVER_UNIT" then
 		if UnitExists("mouseover") and UnitIsPlayer("mouseover") and not UnitIsUnit("mouseover", "player") then
-			self:EnqueueInspect("mouseover")
+			EnqueueInspect("mouseover")
 		end
 	elseif event == "PLAYER_EQUIPMENT_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
-		self:InvalidateSelfCache()
+		InvalidateSelfCache()
 	elseif event == "INSPECT_READY" then
-		if not self.currentlyInspecting then
+		if not currentlyInspecting then
 			ClearInspectPlayer()
 			return
 		end
-		local unit = self:ResolveGuidToUnit(self.currentlyInspecting)
+		local unit = ResolveGuidToUnit(currentlyInspecting)
 		local ilvl = unit and CalculateItemLevel(unit) or nil
 		if ilvl then
-			self.inspectCache[self.currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
+			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
 			local mouseGuid = UnitGUID("mouseover")
-			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == self.currentlyInspecting then
-				self:AddIlvlLine(GameTooltip, ilvl, self:GetSelfIlvl())
+			if UnitExists("mouseover") and mouseGuid and not issecretvalue(mouseGuid) and mouseGuid == currentlyInspecting then
+				AddIlvlLine(GameTooltip, ilvl, GetSelfIlvl())
 			end
 		end
-		self.currentlyInspecting = nil
-		self.inspectingTime = 0
+		currentlyInspecting = nil
+		inspectingTime = 0
 		ClearInspectPlayer()
 	end
 end)
 
-C_Timer.NewTicker(0.1, function()
-	GearTip:DrainQueue()
-end)
+C_Timer.NewTicker(0.1, DrainQueue)
 
 TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
 	if tooltip ~= GameTooltip or not data then return end
@@ -196,19 +192,19 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tool
 
 	local ilvl
 	if UnitIsUnit(unit, "player") then
-		ilvl = GearTip:GetSelfIlvl()
+		ilvl = GetSelfIlvl()
 	else
 		local guid = UnitGUID(unit)
 		if not guid or issecretvalue(guid) then return end
-		local cached = GearTip.inspectCache[guid]
-		if cached and (GetTime() - cached.time) < GearTip.CACHE_TTL then
+		local cached = inspectCache[guid]
+		if cached and (GetTime() - cached.time) < CACHE_TTL then
 			ilvl = cached.ilvl
 		else
-			GearTip:EnqueueInspect(unit)
+			EnqueueInspect(unit)
 		end
 	end
 
 	if ilvl then
-		GearTip:AddIlvlLine(tooltip, ilvl, GearTip:GetSelfIlvl())
+		AddIlvlLine(tooltip, ilvl, GetSelfIlvl())
 	end
 end)
