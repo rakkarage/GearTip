@@ -30,7 +30,7 @@ local function CalculateItemLevel(unit)
 			end
 		end
 	end
-	return itemCount > 0 and (totalItemLevel / itemCount) or nil
+	return itemCount > 0 and (totalItemLevel / itemCount)
 end
 
 local function GetSelfIlvl()
@@ -152,7 +152,6 @@ eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 eventFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
 eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-
 eventFrame:SetScript("OnEvent", function(self, event)
 	if event == "GROUP_ROSTER_UPDATE" then
 		EnqueueGroupMembers()
@@ -168,7 +167,7 @@ eventFrame:SetScript("OnEvent", function(self, event)
 			return
 		end
 		local unit = ResolveGuidToUnit(currentlyInspecting)
-		local ilvl = unit and CalculateItemLevel(unit) or nil
+		local ilvl = unit and CalculateItemLevel(unit)
 		if ilvl then
 			inspectCache[currentlyInspecting] = { ilvl = ilvl, time = GetTime() }
 			local mouseGuid = UnitGUID("mouseover")
