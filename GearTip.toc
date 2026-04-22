@@ -3,7 +3,7 @@
 ## Category: User Interface
 ## Author: rakkarage
 ## IconTexture: Interface/AddOns/GearTip/GearTip.png
-## Interface: 120001
+## Interface: 120005
 ## Version: v2026.4
 
 GearTip.lua
