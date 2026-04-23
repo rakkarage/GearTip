@@ -1,5 +1,7 @@
 -- ⚙️ GearTip: Shows average item level on unit tooltips.
 
+local _frame = CreateFrame("Frame")
+
 local _inspectCache = {}
 local _inspectQueue = {}
 local _queuedGuids = {}
@@ -146,13 +148,12 @@ local function EnqueueGroupMembers()
 	end
 end
 
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("INSPECT_READY")
-eventFrame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
-eventFrame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-eventFrame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
-eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
-eventFrame:SetScript("OnEvent", function(_, event)
+_frame:RegisterEvent("INSPECT_READY")
+_frame:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
+_frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
+_frame:RegisterEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+_frame:RegisterEvent("GROUP_ROSTER_UPDATE")
+_frame:SetScript("OnEvent", function(_, event)
 	if event == "GROUP_ROSTER_UPDATE" then
 		EnqueueGroupMembers()
 	elseif event == "UPDATE_MOUSEOVER_UNIT" then
